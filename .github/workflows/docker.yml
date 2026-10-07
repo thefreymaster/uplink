@@ -24,7 +24,8 @@ jobs:
       postgres:
         image: postgres:14
         env:
-          POSTGRES_PASSWORD: postgres
+          # Throwaway database inside the runner; trust auth keeps credentials out of the repo.
+          POSTGRES_HOST_AUTH_METHOD: trust
         ports:
           - 5432:5432
         options: >-
@@ -61,7 +62,7 @@ jobs:
         run: |
           docker run -d --name uplink --network host \
             -e SERVER_NAME=CI \
-            -e DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/uplink \
+            -e DATABASE_URL=postgres://postgres@127.0.0.1:5432/uplink \
             uplink:ci
           for i in $(seq 1 30); do
             curl -fsS localhost:5090/api/health 2>/dev/null | grep -q '"connected":true' && break

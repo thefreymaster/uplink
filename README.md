@@ -40,11 +40,11 @@ You need:
 
 ### 1. Create a database user
 
-On the Docker tab, click the **postgresql14** icon and choose **Console**, then run this with a password
-of your own:
+On the Docker tab, click the **postgresql14** icon and choose **Console**, then run this with `<password>`
+replaced by one of your own:
 
 ```sh
-psql -U postgres -c "CREATE USER uplink WITH PASSWORD 'change-me' CREATEDB;"
+psql -U postgres -c "CREATE USER uplink WITH PASSWORD '<password>' CREATEDB;"
 ```
 
 `CREATEDB` lets Uplink create its own `uplink` database and tables on first start. If you'd rather not
@@ -90,15 +90,16 @@ services:
 
 ### 4. Paste the settings
 
-Gear icon → **Edit Stack** → **ENV File**, paste this, put in the password from step 1 (and your server's
-name), and save:
+Gear icon → **Edit Stack** → **ENV File**, paste this, replace `<password>` with the one from step 1 (and set
+your server's name), and save:
 
 ```ini
 SERVER_NAME=Tower
-DATABASE_URL=postgres://uplink:change-me@host.docker.internal:5432/uplink
+DATABASE_URL=postgres://uplink:<password>@host.docker.internal:5432/uplink
 ```
 
-Everything else has a default (see [Configuration](#configuration)). `host.docker.internal` is how the
+If your password contains `@`, `:`, `/`, `#` or `%`, percent-encode those characters in the URL (`@` becomes
+`%40`), or pick a password without them. Everything else has a default (see [Configuration](#configuration)). `host.docker.internal` is how the
 container reaches the Unraid host; the server's LAN IP works too. To use a port other than 5090, add
 `UPLINK_PORT=<port>`.
 
@@ -235,7 +236,7 @@ Requires Node 22 or newer and a PostgreSQL database.
 
 ```sh
 npm install
-DATABASE_URL=postgres://user:pass@localhost:5432/uplink npm run dev
+DATABASE_URL=postgres://<user>:<password>@localhost:5432/uplink npm run dev
 ```
 
 `npm run dev` serves the API, the WebSockets and the Vite dev server (with hot reload) on one port,
