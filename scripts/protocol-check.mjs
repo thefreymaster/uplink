@@ -1,7 +1,8 @@
 // Protocol-level checks against a running, idle server (no browser needed).
 //   node scripts/protocol-check.mjs                 # against localhost:5090
 //   BASE=192.168.1.10:5090 node scripts/protocol-check.mjs
-// Set ALLOW_DELETE=1 to also verify deletion; that removes the most recent stored result.
+// ALLOW_WRITE=1 also saves a run, checks it is broadcast and exported, then deletes that same run
+// (it cleans up after itself, but other open apps will briefly see it).
 import WebSocket from 'ws';
 
 const BASE = process.env.BASE ?? 'localhost:5090';
@@ -107,22 +108,31 @@ check('a new session is welcomed once idle', (await waitFor(c.messages, (m) => m
 c.ws.close();
 await sleep(100);
 
-// Delete is broadcast live; CSV export works
-const page = await (await fetch(`http://${BASE}/api/tests?limit=1`)).json();
+// CSV export is well-formed even when empty.
 const csv = await fetch(`http://${BASE}/api/export.csv`);
 const text = await csv.text();
-check(
-  'CSV export has a header and rows',
-  csv.headers.get('content-type')?.startsWith('text/csv') && text.startsWith('id,finished_at') && text.trim().split('\n').length >= 2,
-  `${text.trim().split('\n').length - 1} rows`,
-);
-if (page.items[0] && process.env.ALLOW_DELETE === '1') {
-  const id = page.items[0].id;
-  const del = await fetch(`http://${BASE}/api/tests/${id}`, { method: 'DELETE' });
-  const deletedEvent = await waitFor(live.messages, (m) => m.t === 'test-deleted' && m.id === id);
-  check('DELETE removes the test and is broadcast live', del.status === 204 && Boolean(deletedEvent));
-  const gone = await fetch(`http://${BASE}/api/tests/${id}`);
-  check('deleted test is gone', gone.status === 404);
+check('CSV export has the expected header', csv.headers.get('content-type')?.startsWith('text/csv') && text.startsWith('id,finished_at'));
+
+if (process.env.ALLOW_WRITE === '1') {
+  // A completed run is saved, broadcast, exported, and can be deleted again.
+  const d = await open('/ws/session');
+  d.ws.send(JSON.stringify(hello('Protocol check')));
+  await waitFor(d.messages, (m) => m.t === 'welcome');
+  const latency = { medianMs: 1, minMs: 0.8, maxMs: 1.4, avgMs: 1.05, jitterMs: 0.1, count: 20, lost: 0 };
+  d.ws.send(JSON.stringify({ t: 'result', result: { latency, download: null, loadedDown: null, loadedUp: null, samples: { download: [], upload: [], ping: [] } } }));
+  const saved = await waitFor(d.messages, (m) => m.t === 'saved');
+  check('a finished run is saved', saved?.persisted === true && saved.test.latencyMs === 1, saved?.error ?? '');
+  const id = saved?.test.id;
+  check('the saved run is broadcast to live clients', Boolean(await waitFor(live.messages, (m) => m.t === 'test-saved' && m.test.id === id)));
+  const csvAfter = await (await fetch(`http://${BASE}/api/export.csv`)).text();
+  check('the saved run appears in the CSV export', Boolean(id) && csvAfter.includes(id));
+  d.ws.close();
+  if (id) {
+    const del = await fetch(`http://${BASE}/api/tests/${id}`, { method: 'DELETE' });
+    const deletedEvent = await waitFor(live.messages, (m) => m.t === 'test-deleted' && m.id === id);
+    check('DELETE removes the run and is broadcast live', del.status === 204 && Boolean(deletedEvent));
+    check('the deleted run is gone', (await fetch(`http://${BASE}/api/tests/${id}`)).status === 404);
+  }
 }
 const badId = await fetch(`http://${BASE}/api/tests/not-a-uuid`);
 check('malformed id is a clean 404', badId.status === 404);

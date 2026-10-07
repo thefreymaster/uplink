@@ -64,12 +64,12 @@ jobs:
             -e DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/uplink \
             uplink:ci
           for i in $(seq 1 30); do
-            curl -fsS localhost:5090/api/health | grep -q '"connected":true' && break
+            curl -fsS localhost:5090/api/health 2>/dev/null | grep -q '"connected":true' && break
             sleep 1
           done
           curl -fsS localhost:5090/api/health | grep -q '"connected":true' || { echo "Database never connected"; exit 1; }
           curl -fsS -o /dev/null localhost:5090/
-          BASE=localhost:5090 npm run check:protocol
+          BASE=localhost:5090 ALLOW_WRITE=1 npm run check:protocol
 
       - name: Container logs
         if: always()

@@ -19,8 +19,8 @@ Keep the README's Unraid steps and its embedded copy of `docker-compose.yml` in 
 - `npm run build` → `dist/client` (Vite + vite-plugin-pwa) and `dist/server/index.js` (esbuild, deps
   external). `npm start` runs it with `NODE_ENV=production`.
 - `npm run check:protocol` (`BASE=host:port`) exercises the realtime protocol against a running, idle
-  server: busy lock, live status, stream admission, origin check, cancel cleanup, CSV. `ALLOW_DELETE=1`
-  adds a deletion check that removes the newest stored result, so never set it against real data.
+  server: busy lock, live status, stream admission, origin check, cancel cleanup, CSV. `ALLOW_WRITE=1`
+  (used in CI) also saves a run, checks the live broadcast and export, then deletes that same run.
 - `node scripts/link-shaper.mjs <listen> <target> <downMbps> <upMbps> <oneWayMs>` puts an emulated link
   in front of the server. Point a browser at the listen port and the result should match the configured
   rate within ~0.5%; that is the accuracy regression test for any change to the measurement path.
