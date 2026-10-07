@@ -3,12 +3,15 @@ services:
     image: ghcr.io/thefreymaster/uplink:latest
     container_name: uplink
     init: true
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
       - "${UPLINK_PORT:-5090}:5090"
     environment:
       - SERVER_NAME=${SERVER_NAME:-Unraid}
-      - DATABASE_URL=${DATABASE_URL:?Set DATABASE_URL in the .env file (see .env.example)}
-      - DB_AUTO_CREATE=${DB_AUTO_CREATE:-true}
+      # The bundled database below; point this at another PostgreSQL to use that instead.
+      - DATABASE_URL=${DATABASE_URL:-postgres://uplink@db:5432/uplink}
       - TRUST_PROXY=${TRUST_PROXY:-false}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
       - MAX_TEST_SECONDS=${MAX_TEST_SECONDS:-30}
@@ -21,4 +24,23 @@ services:
       # WebUI link and icon in Unraid's Docker tab.
       net.unraid.docker.webui: "http://[IP]:[PORT:5090]/"
       net.unraid.docker.icon: "https://raw.githubusercontent.com/thefreymaster/uplink/main/public/icons/icon-512.png"
+    restart: unless-stopped
+
+  # Uplink's own database. It publishes no port, so only this stack can reach it,
+  # which is why it runs without a password.
+  db:
+    image: postgres:18-alpine
+    container_name: uplink-db
+    environment:
+      - POSTGRES_USER=uplink
+      - POSTGRES_DB=uplink
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    volumes:
+      - ${DB_DATA_PATH:-/mnt/user/appdata/uplink/postgres}:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U uplink -d uplink"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    stop_grace_period: 1m
     restart: unless-stopped

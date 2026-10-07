@@ -5,7 +5,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## What this is
 
 Uplink: a self-hosted LAN speed test (React PWA + Express/WebSocket backend + PostgreSQL), deployed as a
-Docker Compose stack on the Unraid server next to the existing `postgresql14` container. GitHub remote:
+Docker Compose stack on the Unraid server: the app plus its own `db` service (PostgreSQL 18, trust auth,
+no published port, data in `/mnt/user/appdata/uplink/postgres`). GitHub remote:
 `thefreymaster/uplink` (public). Unraid installs through Compose Manager's UI from the compose file
 embedded in README.md, pulling `ghcr.io/thefreymaster/uplink:latest`; nothing is built on the server.
 Keep the README's Unraid steps and its embedded copy of `docker-compose.yml` in sync with the real file.
@@ -60,12 +61,15 @@ These are what make the numbers trustworthy; keep them when refactoring.
 
 - `.github/workflows/docker.yml` publishes the image on every push to `main` (`latest`, `sha-<short>`)
   and on `v*` tags (`X.Y.Z`), after type-checking and running `check:protocol` against the built
-  container with a PostgreSQL 14 service. A red run means nothing was published.
+  container with a PostgreSQL 14 service, then starts the real `docker-compose.yml` (bundled database)
+  and runs them again. A red run means nothing was published.
 - `docker-compose.yml` pulls the published image; `docker-compose.build.yml` is the override for building
   from a checkout.
 - Runtime image is `node:24-slim` (glibc) so `bufferutil`'s prebuilt native module loads; it matters for
   upload unmasking at multi-gigabit rates. Client libraries are devDependencies on purpose so
   `npm ci --omit=dev` keeps the runtime layer to server packages only.
+- The bundled database runs with `POSTGRES_HOST_AUTH_METHOD=trust`. That is only safe because the `db`
+  service publishes no port; CI fails if it ever does. Never add `ports:` to it.
 - PWA install and service workers need HTTPS (or localhost); plain `http://<ip>:5090` works without them.
 - Behind a reverse proxy set `TRUST_PROXY`; if the proxy rewrites `Host`, WebSockets are refused until
   the origin is listed in `ALLOWED_ORIGINS` (a warning is logged with the exact origin).

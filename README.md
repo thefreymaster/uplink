@@ -28,35 +28,18 @@ streamed live to every other open copy of the app. It installs as a PWA on phone
 
 ## Install on Unraid
 
-Uplink runs from one compose file that pulls a ready-made image
-(`ghcr.io/thefreymaster/uplink`), so there is nothing to clone or build on the server.
+Uplink runs as a small stack: the app (`ghcr.io/thefreymaster/uplink`) and its own PostgreSQL
+database. Both images are pulled ready-made, so there is nothing to clone, build or configure.
 
-You need:
+You need Unraid 6.12 or newer with **Docker Compose Manager** from Community Applications. It adds the
+**Compose** section at the bottom of the Docker tab.
 
-- Unraid 6.12 or newer with **Docker Compose Manager** from Community Applications. It adds the
-  **Compose** section at the bottom of the Docker tab.
-- Your **PostgreSQL 14** container (for example `postgresql14` from Community Applications) with port
-  5432 published on the Unraid host. Redis and MariaDB aren't needed.
-
-### 1. Create a database user
-
-On the Docker tab, click the **postgresql14** icon and choose **Console**, then run this with `<password>`
-replaced by one of your own:
-
-```sh
-psql -U postgres -c "CREATE USER uplink WITH PASSWORD '<password>' CREATEDB;"
-```
-
-`CREATEDB` lets Uplink create its own `uplink` database and tables on first start. If you'd rather not
-grant that, also run `psql -U postgres -c "CREATE DATABASE uplink OWNER uplink;"` and add
-`DB_AUTO_CREATE=false` in step 4. (If your container's superuser isn't `postgres`, use yours.)
-
-### 2. Add the stack
+### 1. Add the stack
 
 At the bottom of the Docker tab, under **Compose**, click **Add New Stack**, enter `uplink` and confirm.
 Leave **Advanced** as it is.
 
-### 3. Paste the compose file
+### 2. Paste the compose file
 
 Click the gear icon next to **uplink** → **Edit Stack** → **Compose File**, replace everything with this,
 and save:
@@ -67,12 +50,15 @@ services:
     image: ghcr.io/thefreymaster/uplink:latest
     container_name: uplink
     init: true
+    depends_on:
+      db:
+        condition: service_healthy
     ports:
       - "${UPLINK_PORT:-5090}:5090"
     environment:
       - SERVER_NAME=${SERVER_NAME:-Unraid}
-      - DATABASE_URL=${DATABASE_URL:?Set DATABASE_URL in the .env file (see .env.example)}
-      - DB_AUTO_CREATE=${DB_AUTO_CREATE:-true}
+      # The bundled database below; point this at another PostgreSQL to use that instead.
+      - DATABASE_URL=${DATABASE_URL:-postgres://uplink@db:5432/uplink}
       - TRUST_PROXY=${TRUST_PROXY:-false}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
       - MAX_TEST_SECONDS=${MAX_TEST_SECONDS:-30}
@@ -86,54 +72,90 @@ services:
       net.unraid.docker.webui: "http://[IP]:[PORT:5090]/"
       net.unraid.docker.icon: "https://raw.githubusercontent.com/thefreymaster/uplink/main/public/icons/icon-512.png"
     restart: unless-stopped
+
+  # Uplink's own database. It publishes no port, so only this stack can reach it,
+  # which is why it runs without a password.
+  db:
+    image: postgres:18-alpine
+    container_name: uplink-db
+    environment:
+      - POSTGRES_USER=uplink
+      - POSTGRES_DB=uplink
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    volumes:
+      - ${DB_DATA_PATH:-/mnt/user/appdata/uplink/postgres}:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U uplink -d uplink"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+    stop_grace_period: 1m
+    restart: unless-stopped
 ```
 
-### 4. Paste the settings
-
-Gear icon → **Edit Stack** → **ENV File**, paste this, replace `<password>` with the one from step 1 (and set
-your server's name), and save:
+Optionally, under **Edit Stack** → **ENV File**, name your server (and add any other
+[setting](#configuration)):
 
 ```ini
 SERVER_NAME=Tower
-DATABASE_URL=postgres://uplink:<password>@host.docker.internal:5432/uplink
 ```
 
-If your password contains `@`, `:`, `/`, `#` or `%`, percent-encode those characters in the URL (`@` becomes
-`%40`), or pick a password without them. Everything else has a default (see [Configuration](#configuration)). `host.docker.internal` is how the
-container reaches the Unraid host; the server's LAN IP works too. To use a port other than 5090, add
-`UPLINK_PORT=<port>`.
+### 3. Start it
 
-### 5. Start it
-
-Gear icon → **Compose Up**. Compose Manager downloads the image and starts it, and **uplink** appears in
-the Docker list with a **WebUI** link. Open `http://<your-unraid-ip>:5090` on any device and press
-**Start**.
+Gear icon → **Compose Up**. Compose Manager pulls both images, starts **uplink-db**, and starts
+**uplink** once the database is ready. **uplink** then appears in the Docker list with a **WebUI** link.
+Open `http://<your-unraid-ip>:5090` on any device and press **Start**.
 
 Give each device a name under **Settings → This device** so results are easy to tell apart in History.
 If something looks off, open the container's **Logs** from the Docker tab: a healthy start ends with
 `Database ready`, and **Settings → Server** in the app shows the database status.
 
+### About the database
+
+- Results live in `/mnt/user/appdata/uplink/postgres` (set `DB_DATA_PATH` to move them). Include that
+  folder in your appdata backups.
+- It has no password because nothing outside the stack can reach it: it publishes no port and sits on
+  the stack's private network. Its log warns about running without a password; that is expected here.
+- It's pinned to PostgreSQL 18, so updates bring fixes without changing the version under your data.
+
 ### Updating
 
-Gear icon → **Update Stack**. It pulls the newest image and recreates the container; results stay in
-PostgreSQL. Open copies of the app then show an *Update available* prompt (it waits if a test is running).
+Gear icon → **Update Stack**. It pulls the newest images and recreates the containers; your results stay
+in the database folder. Open copies of the app then show an *Update available* prompt (it waits if a
+test is running).
 
 A new image is published automatically on every push to `main` (tag `latest`). Each build is also tagged
 `sha-<commit>` if you ever want to pin one.
 
+### Using a PostgreSQL you already run
+
+To keep results in an existing PostgreSQL (for example a `postgresql14` container) instead:
+
+1. In that container's **Console**, create a user, replacing `<password>`:
+
+   ```sh
+   psql -U postgres -c "CREATE USER uplink WITH PASSWORD '<password>' CREATEDB;"
+   ```
+
+   `CREATEDB` lets Uplink create its own database on first start.
+2. In the compose file, delete the whole `db:` service and the `depends_on:` block under `uplink`.
+3. In the ENV File, add
+   `DATABASE_URL=postgres://uplink:<password>@host.docker.internal:5432/uplink`.
+   `host.docker.internal` reaches the Unraid host; the server's LAN IP works too. If the password
+   contains `@`, `:`, `/`, `#` or `%`, percent-encode them (`@` becomes `%40`).
+
 ### From a terminal instead
 
-The same files work on any Docker host:
+The same file works on any Docker host:
 
 ```sh
 mkdir -p /mnt/user/appdata/uplink && cd /mnt/user/appdata/uplink
 curl -fsSLO https://raw.githubusercontent.com/thefreymaster/uplink/main/docker-compose.yml
-curl -fsSL https://raw.githubusercontent.com/thefreymaster/uplink/main/.env.example -o .env
-nano .env    # set DATABASE_URL and SERVER_NAME
 docker compose up -d
 ```
 
-Update with `docker compose pull && docker compose up -d`.
+Settings go in a `.env` file next to it (see `.env.example`). Update with
+`docker compose pull && docker compose up -d`.
 
 ### Installing the app (HTTPS)
 
@@ -185,17 +207,19 @@ right-click) also offers **Run speed test** directly.
   the limit.
 - Wi-Fi varies from second to second. Longer runs (15 or 30 s) give steadier numbers; more connections
   help fill fast links, and **1** shows single-connection speed.
-- If the database lives on a custom `br0`/macvlan network, the container may not be able to reach it
-  through the host. Use the database's own IP in `DATABASE_URL`, or enable *Host access to custom
-  networks* in Unraid's Docker settings.
+- If you use your own PostgreSQL and it lives on a custom `br0`/macvlan network, the container may not
+  reach it through the host. Use the database's own IP in `DATABASE_URL`, or enable *Host access to
+  custom networks* in Unraid's Docker settings.
 
 ## Configuration
 
-All settings are environment variables (in `.env` when using compose).
+All settings are environment variables: the stack's **ENV File** in Compose Manager, or `.env` next to
+`docker-compose.yml`. None are required.
 
 | Variable | Default | Description |
 |---|---|---|
-| `DATABASE_URL` | — | PostgreSQL connection string. Without it (and without `PG*` variables) tests still run but nothing is saved. |
+| `DATABASE_URL` | bundled database | PostgreSQL connection string. The compose file points it at its own `db` service; set it to use another PostgreSQL. Without any database, tests still run but nothing is saved. |
+| `DB_DATA_PATH` | `/mnt/user/appdata/uplink/postgres` | Compose only: where the bundled database stores its files. |
 | `DB_AUTO_CREATE` | `true` | Create the database on start if it doesn't exist (needs `CREATEDB`). Tables are always created/migrated automatically. |
 | `SERVER_NAME` | host name | Name shown for the server in the app. |
 | `UPLINK_PORT` | `5090` | Host port, compose only. Inside the container the app listens on `PORT` (5090). |
@@ -252,9 +276,9 @@ DATABASE_URL=postgres://<user>:<password>@localhost:5432/uplink npm run dev
 | `node scripts/link-shaper.mjs 5091 5090 100 20 10` | Emulate a 100/20 Mbps link with a 20 ms round trip on port 5091. |
 | `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build` | Build and run the image from your checkout instead of pulling it. |
 
-Every push runs `.github/workflows/docker.yml`: it type-checks, builds the image, starts it against a
-PostgreSQL 14 service, runs the protocol checks, and (on `main` and `v*` tags) publishes to
-`ghcr.io/thefreymaster/uplink`.
+Every push runs `.github/workflows/docker.yml`: it type-checks, builds the image, runs the protocol
+checks against it with an external PostgreSQL 14 and again as the full compose stack with its bundled
+database, and (on `main` and `v*` tags) publishes to `ghcr.io/thefreymaster/uplink`.
 
 ### Layout
 
