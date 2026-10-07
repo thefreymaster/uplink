@@ -80,7 +80,7 @@ jobs:
           export DB_DATA_PATH="$RUNNER_TEMP/uplink-db"
           docker compose up -d
           # The database runs without a password only because nothing outside the stack can reach it.
-          if docker compose port db 5432 2>/dev/null | grep -q .; then echo "The db service must not publish a port"; exit 1; fi
+          if [ -n "$(docker port uplink-db)" ]; then echo "The db service must not publish a port: $(docker port uplink-db)"; exit 1; fi
           for i in $(seq 1 60); do
             curl -fsS localhost:5090/api/health 2>/dev/null | grep -q '"connected":true' && break
             sleep 1
