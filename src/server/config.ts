@@ -47,7 +47,7 @@ const databaseUrl = process.env.DATABASE_URL?.trim() || undefined;
 export const config = {
   version: readVersion(),
   production: process.env.NODE_ENV === 'production',
-  port: intEnv('PORT', 3000, 1, 65535),
+  port: intEnv('PORT', 5090, 1, 65535),
   host: process.env.HOST?.trim() || undefined,
   serverName: process.env.SERVER_NAME?.trim() || defaultServerName(),
   databaseUrl,

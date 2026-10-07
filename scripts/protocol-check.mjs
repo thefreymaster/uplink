@@ -1,10 +1,10 @@
 // Protocol-level checks against a running, idle server (no browser needed).
-//   node scripts/protocol-check.mjs                 # against localhost:3000
-//   BASE=192.168.1.10:3000 node scripts/protocol-check.mjs
+//   node scripts/protocol-check.mjs                 # against localhost:5090
+//   BASE=192.168.1.10:5090 node scripts/protocol-check.mjs
 // Set ALLOW_DELETE=1 to also verify deletion; that removes the most recent stored result.
 import WebSocket from 'ws';
 
-const BASE = process.env.BASE ?? 'localhost:3000';
+const BASE = process.env.BASE ?? 'localhost:5090';
 const results = [];
 const check = (name, ok, detail = '') => {
   results.push({ name, ok });

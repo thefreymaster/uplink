@@ -5,7 +5,7 @@ services:
     container_name: uplink
     init: true
     ports:
-      - "${UPLINK_PORT:-3000}:3000"
+      - "${UPLINK_PORT:-5090}:5090"
     environment:
       - SERVER_NAME=${SERVER_NAME:-Unraid}
       - DATABASE_URL=${DATABASE_URL:?Set DATABASE_URL in .env (see .env.example)}
@@ -20,6 +20,6 @@ services:
       - "host.docker.internal:host-gateway"
     labels:
       # Adds the "WebUI" entry in Unraid's Docker tab.
-      net.unraid.docker.webui: "http://[IP]:[PORT:3000]/"
+      net.unraid.docker.webui: "http://[IP]:[PORT:5090]/"
       # net.unraid.docker.icon: "https://<where-you-host-it>/icon-512.png"
     restart: unless-stopped

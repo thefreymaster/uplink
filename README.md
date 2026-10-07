@@ -80,7 +80,7 @@ Set at least:
 |---|---|---|
 | `DATABASE_URL` | `postgres://uplink:change-me@host.docker.internal:5432/uplink` | `host.docker.internal` reaches the Unraid host from the container. Your server's LAN IP works too. |
 | `SERVER_NAME` | `Tower` | Shown in the app as the other end of the link. |
-| `UPLINK_PORT` | `3000` | Port you'll open in the browser. Pick another if 3000 is taken. |
+| `UPLINK_PORT` | `5090` | Port you'll open in the browser. Change it if 5090 is taken. |
 
 ### 4. Build and start
 
@@ -100,7 +100,7 @@ advanced settings, then **Compose Up**. The terminal route above is the simplest
 
 ### 5. Open it
 
-Browse to `http://<your-unraid-ip>:3000` from any device on your network and press **Start**.
+Browse to `http://<your-unraid-ip>:5090` from any device on your network and press **Start**.
 Give each device a name under **Settings → This device** so you can tell results apart in History.
 
 Check the logs if anything looks off:
@@ -137,16 +137,16 @@ Then on Unraid keep `docker-compose.yml` and `.env` in `/mnt/user/appdata/uplink
 ### Installing the app (HTTPS)
 
 Browsers only allow installing a PWA from an HTTPS address (or `localhost`). Over plain
-`http://<ip>:3000` everything works, but there's no install option. To install it, serve Uplink through
+`http://<ip>:5090` everything works, but there's no install option. To install it, serve Uplink through
 your reverse proxy:
 
-- **Nginx Proxy Manager:** add a proxy host for e.g. `speed.example.com` → `http://<unraid-ip>:3000`,
+- **Nginx Proxy Manager:** add a proxy host for e.g. `speed.example.com` → `http://<unraid-ip>:5090`,
   turn on **Websockets Support**, and request a certificate on the SSL tab.
 - **SWAG / plain nginx:**
 
   ```nginx
   location / {
-      proxy_pass http://<unraid-ip>:3000;
+      proxy_pass http://<unraid-ip>:5090;
       proxy_http_version 1.1;
       proxy_set_header Upgrade $http_upgrade;
       proxy_set_header Connection "upgrade";
@@ -173,7 +173,7 @@ right-click) also offers **Run speed test** directly.
 ### Getting accurate results
 
 - A proxy in the path adds work for every byte. For multi-gigabit LAN tests, use the direct
-  `http://<unraid-ip>:3000` address.
+  `http://<unraid-ip>:5090` address.
 - The container uses bridge networking with a published port, which is fine for gigabit. For 10GbE, put
   it on the host network instead (`network_mode: host` and remove `ports`) to skip Docker's NAT.
 - Browsers top out around 2 to 4 Gbps on typical hardware; above that the device, not the network, is
@@ -193,7 +193,7 @@ All settings are environment variables (in `.env` when using compose).
 | `DATABASE_URL` | — | PostgreSQL connection string. Without it (and without `PG*` variables) tests still run but nothing is saved. |
 | `DB_AUTO_CREATE` | `true` | Create the database on start if it doesn't exist (needs `CREATEDB`). Tables are always created/migrated automatically. |
 | `SERVER_NAME` | host name | Name shown for the server in the app. |
-| `UPLINK_PORT` | `3000` | Host port, compose only. Inside the container the app listens on `PORT` (3000). |
+| `UPLINK_PORT` | `5090` | Host port, compose only. Inside the container the app listens on `PORT` (5090). |
 | `TRUST_PROXY` | `false` | `true`, a hop count, or proxy addresses/subnets (e.g. `172.18.0.0/16`). Makes client IPs come from `X-Forwarded-For`. |
 | `ALLOWED_ORIGINS` | — | Extra origins allowed to open WebSockets, comma separated. `*` turns the check off. |
 | `MAX_TEST_SECONDS` | `30` | Longest run a client may request per direction (5 to 120). |
@@ -235,7 +235,7 @@ DATABASE_URL=postgres://user:pass@localhost:5432/uplink npm run dev
 ```
 
 `npm run dev` serves the API, the WebSockets and the Vite dev server (with hot reload) on one port,
-`http://localhost:3000`.
+`http://localhost:5090`.
 
 | Command | |
 |---|---|
@@ -244,7 +244,7 @@ DATABASE_URL=postgres://user:pass@localhost:5432/uplink npm run dev
 | `npm run typecheck` | Type-check client and server. |
 | `npm run icons` | Regenerate the app icons in `public/` from `scripts/generate-icons.mjs`. |
 | `npm run check:protocol` | Protocol checks against a running, idle server (`BASE=host:port`). |
-| `node scripts/link-shaper.mjs 3010 3000 100 20 10` | Emulate a 100/20 Mbps link with a 20 ms round trip on port 3010. |
+| `node scripts/link-shaper.mjs 5091 5090 100 20 10` | Emulate a 100/20 Mbps link with a 20 ms round trip on port 5091. |
 
 ### Layout
 

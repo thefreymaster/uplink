@@ -11,7 +11,7 @@ when anything about deployment changes.
 
 ## Commands
 
-- `npm run dev` runs everything on one port (default 3000): Express API, the WebSocket endpoints and Vite
+- `npm run dev` runs everything on one port (default 5090; 3000 is avoided because it's usually taken): Express API, the WebSocket endpoints and Vite
   in middleware mode with HMR. Needs `DATABASE_URL`; without it tests run but nothing is saved.
 - `npm run typecheck` (TypeScript 7, two projects: `tsconfig.client.json` DOM, `tsconfig.server.json`
   Node). Both must stay clean.
@@ -60,6 +60,6 @@ These are what make the numbers trustworthy; keep them when refactoring.
 - Runtime image is `node:24-slim` (glibc) so `bufferutil`'s prebuilt native module loads; it matters for
   upload unmasking at multi-gigabit rates. Client libraries are devDependencies on purpose so
   `npm ci --omit=dev` keeps the runtime layer to server packages only.
-- PWA install and service workers need HTTPS (or localhost); plain `http://<ip>:3000` works without them.
+- PWA install and service workers need HTTPS (or localhost); plain `http://<ip>:5090` works without them.
 - Behind a reverse proxy set `TRUST_PROXY`; if the proxy rewrites `Host`, WebSockets are refused until
   the origin is listed in `ALLOWED_ORIGINS` (a warning is logged with the exact origin).

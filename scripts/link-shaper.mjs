@@ -2,7 +2,7 @@
 // match a known rate: a TCP proxy with a shared token bucket per direction plus fixed delay.
 //
 //   node scripts/link-shaper.mjs <listenPort> <targetPort> <downMbps> <upMbps> <oneWayDelayMs>
-//   node scripts/link-shaper.mjs 3010 3000 100 20 10   # 100/20 Mbps, 20 ms round trip; open http://localhost:3010
+//   node scripts/link-shaper.mjs 5091 5090 100 20 10   # 100/20 Mbps, 20 ms round trip; open http://localhost:5091
 import net from 'node:net';
 
 const [listenPort, targetPort, downMbps, upMbps, delayMs] = process.argv.slice(2).map(Number);
