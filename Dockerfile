@@ -11,7 +11,8 @@ RUN npm run build
 # WebSocket unmasking on the upload path at multi-gigabit rates.
 FROM node:24-slim
 LABEL org.opencontainers.image.title="Uplink" \
-      org.opencontainers.image.description="Self-hosted LAN speed test with history (PWA)"
+      org.opencontainers.image.description="Self-hosted LAN speed test with history (PWA)" \
+      org.opencontainers.image.source="https://github.com/thefreymaster/uplink"
 ENV NODE_ENV=production \
     PORT=5090
 WORKDIR /app

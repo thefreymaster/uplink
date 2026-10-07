@@ -6,5 +6,6 @@ dist
 *.log
 Dockerfile
 docker-compose*.yml
+.github
 .dockerignore
 README.md

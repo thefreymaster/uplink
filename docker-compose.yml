@@ -1,14 +1,13 @@
 services:
   uplink:
-    build: .
-    image: uplink:latest
+    image: ghcr.io/thefreymaster/uplink:latest
     container_name: uplink
     init: true
     ports:
       - "${UPLINK_PORT:-5090}:5090"
     environment:
       - SERVER_NAME=${SERVER_NAME:-Unraid}
-      - DATABASE_URL=${DATABASE_URL:?Set DATABASE_URL in .env (see .env.example)}
+      - DATABASE_URL=${DATABASE_URL:?Set DATABASE_URL in the .env file (see .env.example)}
       - DB_AUTO_CREATE=${DB_AUTO_CREATE:-true}
       - TRUST_PROXY=${TRUST_PROXY:-false}
       - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
@@ -19,7 +18,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     labels:
-      # Adds the "WebUI" entry in Unraid's Docker tab.
+      # WebUI link and icon in Unraid's Docker tab.
       net.unraid.docker.webui: "http://[IP]:[PORT:5090]/"
-      # net.unraid.docker.icon: "https://<where-you-host-it>/icon-512.png"
+      net.unraid.docker.icon: "https://raw.githubusercontent.com/thefreymaster/uplink/main/public/icons/icon-512.png"
     restart: unless-stopped

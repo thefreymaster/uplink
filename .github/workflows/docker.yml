@@ -1,0 +1,106 @@
+name: Docker image
+
+# Builds the image, tests it against PostgreSQL 14, and publishes it to
+# ghcr.io/thefreymaster/uplink (latest, sha-<commit>, and vX.Y.Z for version tags).
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Type-check
+        run: |
+          npm ci --no-audit --no-fund
+          npm run typecheck
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          load: true
+          tags: uplink:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Test the image
+        run: |
+          docker run -d --name uplink --network host \
+            -e SERVER_NAME=CI \
+            -e DATABASE_URL=postgres://postgres:postgres@127.0.0.1:5432/uplink \
+            uplink:ci
+          for i in $(seq 1 30); do
+            curl -fsS localhost:5090/api/health | grep -q '"connected":true' && break
+            sleep 1
+          done
+          curl -fsS localhost:5090/api/health | grep -q '"connected":true' || { echo "Database never connected"; exit 1; }
+          curl -fsS -o /dev/null localhost:5090/
+          BASE=localhost:5090 npm run check:protocol
+
+      - name: Container logs
+        if: always()
+        run: docker logs uplink || true
+
+      - name: Log in to ghcr.io
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tags
+        id: meta
+        if: github.event_name != 'pull_request'
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=semver,pattern={{version}}
+            type=sha,format=short
+
+      - name: Publish
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha

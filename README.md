@@ -28,111 +28,111 @@ streamed live to every other open copy of the app. It installs as a PWA on phone
 
 ## Install on Unraid
 
+Uplink runs from one compose file that pulls a ready-made image
+(`ghcr.io/thefreymaster/uplink`), so there is nothing to clone or build on the server.
+
 You need:
 
-- Unraid 6.12 or newer.
+- Unraid 6.12 or newer with **Docker Compose Manager** from Community Applications. It adds the
+  **Compose** section at the bottom of the Docker tab.
 - Your **PostgreSQL 14** container (for example `postgresql14` from Community Applications) with port
-  5432 published on the Unraid host. Redis and MariaDB are not used.
-- **Docker Compose Manager** from Community Applications (Apps → search "Docker Compose Manager"). It
-  adds a *Compose* section to the Docker tab and the `docker compose` command.
+  5432 published on the Unraid host. Redis and MariaDB aren't needed.
 
 ### 1. Create a database user
 
-Open a terminal on Unraid (the `>_` icon in the top bar) and run, changing the password:
+On the Docker tab, click the **postgresql14** icon and choose **Console**, then run this with a password
+of your own:
 
 ```sh
-docker exec -it postgresql14 psql -U postgres -c "CREATE USER uplink WITH PASSWORD 'change-me' CREATEDB;"
+psql -U postgres -c "CREATE USER uplink WITH PASSWORD 'change-me' CREATEDB;"
 ```
 
 `CREATEDB` lets Uplink create its own `uplink` database and tables on first start. If you'd rather not
-grant that, create the database yourself and set `DB_AUTO_CREATE=false`:
+grant that, also run `psql -U postgres -c "CREATE DATABASE uplink OWNER uplink;"` and add
+`DB_AUTO_CREATE=false` in step 4. (If your container's superuser isn't `postgres`, use yours.)
 
-```sh
-docker exec -it postgresql14 psql -U postgres -c "CREATE DATABASE uplink OWNER uplink;"
+### 2. Add the stack
+
+At the bottom of the Docker tab, under **Compose**, click **Add New Stack**, enter `uplink` and confirm.
+Leave **Advanced** as it is.
+
+### 3. Paste the compose file
+
+Click the gear icon next to **uplink** → **Edit Stack** → **Compose File**, replace everything with this,
+and save:
+
+```yaml
+services:
+  uplink:
+    image: ghcr.io/thefreymaster/uplink:latest
+    container_name: uplink
+    init: true
+    ports:
+      - "${UPLINK_PORT:-5090}:5090"
+    environment:
+      - SERVER_NAME=${SERVER_NAME:-Unraid}
+      - DATABASE_URL=${DATABASE_URL:?Set DATABASE_URL in the .env file (see .env.example)}
+      - DB_AUTO_CREATE=${DB_AUTO_CREATE:-true}
+      - TRUST_PROXY=${TRUST_PROXY:-false}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
+      - MAX_TEST_SECONDS=${MAX_TEST_SECONDS:-30}
+      - MAX_STREAMS=${MAX_STREAMS:-8}
+      - RETENTION_DAYS=${RETENTION_DAYS:-0}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    labels:
+      # WebUI link and icon in Unraid's Docker tab.
+      net.unraid.docker.webui: "http://[IP]:[PORT:5090]/"
+      net.unraid.docker.icon: "https://raw.githubusercontent.com/thefreymaster/uplink/main/public/icons/icon-512.png"
+    restart: unless-stopped
 ```
 
-(Use your container's name if it isn't `postgresql14`, and the superuser you configured if it isn't
-`postgres`.)
+### 4. Paste the settings
 
-### 2. Put the project on the server
+Gear icon → **Edit Stack** → **ENV File**, paste this, put in the password from step 1 (and your server's
+name), and save:
 
-```sh
-cd /mnt/user/appdata
-git clone https://github.com/thefreymaster/uplink.git
-cd uplink
+```ini
+SERVER_NAME=Tower
+DATABASE_URL=postgres://uplink:change-me@host.docker.internal:5432/uplink
 ```
 
-The repository is private, so `git clone` will ask for your GitHub username and a
-[personal access token](https://github.com/settings/tokens) as the password (read-only access to this
-repository is enough). If `git` isn't available on your Unraid version, download the repository as a ZIP
-from GitHub on another machine and copy the extracted folder to `/mnt/user/appdata/uplink` over SMB.
+Everything else has a default (see [Configuration](#configuration)). `host.docker.internal` is how the
+container reaches the Unraid host; the server's LAN IP works too. To use a port other than 5090, add
+`UPLINK_PORT=<port>`.
 
-### 3. Configure
+### 5. Start it
 
-```sh
-cp .env.example .env
-nano .env
-```
+Gear icon → **Compose Up**. Compose Manager downloads the image and starts it, and **uplink** appears in
+the Docker list with a **WebUI** link. Open `http://<your-unraid-ip>:5090` on any device and press
+**Start**.
 
-Set at least:
-
-| Setting | Example | Notes |
-|---|---|---|
-| `DATABASE_URL` | `postgres://uplink:change-me@host.docker.internal:5432/uplink` | `host.docker.internal` reaches the Unraid host from the container. Your server's LAN IP works too. |
-| `SERVER_NAME` | `Tower` | Shown in the app as the other end of the link. |
-| `UPLINK_PORT` | `5090` | Port you'll open in the browser. Change it if 5090 is taken. |
-
-### 4. Build and start
-
-From the terminal:
-
-```sh
-cd /mnt/user/appdata/uplink
-docker compose up -d --build
-```
-
-The first build downloads Node and dependencies and takes a few minutes. When it finishes, the container
-shows up in the Docker tab as **uplink**, with a **WebUI** entry in its menu.
-
-Or, using the Compose Manager UI: Docker tab → *Compose* → **Add New Stack**, name it `uplink`, point the
-stack at `/mnt/user/appdata/uplink` (the folder with `docker-compose.yml` and `.env`) in the stack's
-advanced settings, then **Compose Up**. The terminal route above is the simplest and does the same thing.
-
-### 5. Open it
-
-Browse to `http://<your-unraid-ip>:5090` from any device on your network and press **Start**.
-Give each device a name under **Settings → This device** so you can tell results apart in History.
-
-Check the logs if anything looks off:
-
-```sh
-docker logs -f uplink
-```
-
-A healthy start ends with `Database ready`. Settings → Server in the app also shows the database status.
+Give each device a name under **Settings → This device** so results are easy to tell apart in History.
+If something looks off, open the container's **Logs** from the Docker tab: a healthy start ends with
+`Database ready`, and **Settings → Server** in the app shows the database status.
 
 ### Updating
 
-```sh
-cd /mnt/user/appdata/uplink
-git pull
-docker compose up -d --build
-```
+Gear icon → **Update Stack**. It pulls the newest image and recreates the container; results stay in
+PostgreSQL. Open copies of the app then show an *Update available* prompt (it waits if a test is running).
 
-Open apps pick up the new version on their own: an *Update available* prompt offers a reload (it waits
-if a test is running).
+A new image is published automatically on every push to `main` (tag `latest`). Each build is also tagged
+`sha-<commit>` if you ever want to pin one.
 
-### Building somewhere else instead
+### From a terminal instead
 
-If you'd rather not build on Unraid, build on any machine with Docker and copy the image across:
+The same files work on any Docker host:
 
 ```sh
-docker build --platform linux/amd64 -t uplink:latest .
-docker save uplink:latest | ssh root@tower docker load
+mkdir -p /mnt/user/appdata/uplink && cd /mnt/user/appdata/uplink
+curl -fsSLO https://raw.githubusercontent.com/thefreymaster/uplink/main/docker-compose.yml
+curl -fsSL https://raw.githubusercontent.com/thefreymaster/uplink/main/.env.example -o .env
+nano .env    # set DATABASE_URL and SERVER_NAME
+docker compose up -d
 ```
 
-Then on Unraid keep `docker-compose.yml` and `.env` in `/mnt/user/appdata/uplink` and run
-`docker compose up -d` (without `--build`).
+Update with `docker compose pull && docker compose up -d`.
 
 ### Installing the app (HTTPS)
 
@@ -158,9 +158,13 @@ your reverse proxy:
   }
   ```
 
-Then set `TRUST_PROXY=true` in `.env` (so results show each device's real IP) and run
-`docker compose up -d` again. If your proxy rewrites the `Host` header and the app can't connect, add your
-address to `ALLOWED_ORIGINS`, e.g. `ALLOWED_ORIGINS=https://speed.example.com`.
+- **Tailscale:** if the server is on your tailnet with HTTPS certificates enabled,
+  `tailscale serve --bg 5090` on the server publishes Uplink at `https://<machine>.<tailnet>.ts.net`,
+  reachable only from your tailnet.
+
+Then add `TRUST_PROXY=true` to the stack's **ENV File** (so results show each device's real IP) and run
+**Compose Up** again. If the app can't connect through the proxy, the container log names the origin it
+refused; add it as `ALLOWED_ORIGINS=https://speed.example.com` the same way.
 
 Uplink has no login: anyone who can reach it can run tests and delete results. Keep it on your LAN or
 VPN, or put authentication in front of it at the proxy (e.g. an access list in Nginx Proxy Manager)
@@ -245,6 +249,11 @@ DATABASE_URL=postgres://user:pass@localhost:5432/uplink npm run dev
 | `npm run icons` | Regenerate the app icons in `public/` from `scripts/generate-icons.mjs`. |
 | `npm run check:protocol` | Protocol checks against a running, idle server (`BASE=host:port`). |
 | `node scripts/link-shaper.mjs 5091 5090 100 20 10` | Emulate a 100/20 Mbps link with a 20 ms round trip on port 5091. |
+| `docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build` | Build and run the image from your checkout instead of pulling it. |
+
+Every push runs `.github/workflows/docker.yml`: it type-checks, builds the image, starts it against a
+PostgreSQL 14 service, runs the protocol checks, and (on `main` and `v*` tags) publishes to
+`ghcr.io/thefreymaster/uplink`.
 
 ### Layout
 

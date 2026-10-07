@@ -6,8 +6,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Uplink: a self-hosted LAN speed test (React PWA + Express/WebSocket backend + PostgreSQL), deployed as a
 Docker Compose stack on the Unraid server next to the existing `postgresql14` container. GitHub remote:
-`thefreymaster/uplink` (private). Install/update steps for Unraid live in README.md; keep them current
-when anything about deployment changes.
+`thefreymaster/uplink` (public). Unraid installs through Compose Manager's UI from the compose file
+embedded in README.md, pulling `ghcr.io/thefreymaster/uplink:latest`; nothing is built on the server.
+Keep the README's Unraid steps and its embedded copy of `docker-compose.yml` in sync with the real file.
 
 ## Commands
 
@@ -57,6 +58,11 @@ These are what make the numbers trustworthy; keep them when refactoring.
 
 ## Deployment notes
 
+- `.github/workflows/docker.yml` publishes the image on every push to `main` (`latest`, `sha-<short>`)
+  and on `v*` tags (`X.Y.Z`), after type-checking and running `check:protocol` against the built
+  container with a PostgreSQL 14 service. A red run means nothing was published.
+- `docker-compose.yml` pulls the published image; `docker-compose.build.yml` is the override for building
+  from a checkout.
 - Runtime image is `node:24-slim` (glibc) so `bufferutil`'s prebuilt native module loads; it matters for
   upload unmasking at multi-gigabit rates. Client libraries are devDependencies on purpose so
   `npm ci --omit=dev` keeps the runtime layer to server packages only.
