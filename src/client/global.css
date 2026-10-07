@@ -1,0 +1,5 @@
+/* Declarations Chakra's style props don't cover. */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}

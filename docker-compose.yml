@@ -1,0 +1,25 @@
+services:
+  uplink:
+    build: .
+    image: uplink:latest
+    container_name: uplink
+    init: true
+    ports:
+      - "${UPLINK_PORT:-3000}:3000"
+    environment:
+      - SERVER_NAME=${SERVER_NAME:-Unraid}
+      - DATABASE_URL=${DATABASE_URL:?Set DATABASE_URL in .env (see .env.example)}
+      - DB_AUTO_CREATE=${DB_AUTO_CREATE:-true}
+      - TRUST_PROXY=${TRUST_PROXY:-false}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-}
+      - MAX_TEST_SECONDS=${MAX_TEST_SECONDS:-30}
+      - MAX_STREAMS=${MAX_STREAMS:-8}
+      - RETENTION_DAYS=${RETENTION_DAYS:-0}
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    labels:
+      # Adds the "WebUI" entry in Unraid's Docker tab.
+      net.unraid.docker.webui: "http://[IP]:[PORT:3000]/"
+      # net.unraid.docker.icon: "https://<where-you-host-it>/icon-512.png"
+    restart: unless-stopped

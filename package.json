@@ -1,0 +1,54 @@
+{
+  "name": "uplink",
+  "version": "1.0.0",
+  "description": "Self-hosted LAN speed test: measures latency, jitter, download and upload between a device and your server in real time.",
+  "private": true,
+  "type": "module",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "tsx watch --clear-screen=false src/server/index.ts",
+    "build": "npm run build:client && npm run build:server",
+    "build:client": "vite build",
+    "build:server": "esbuild src/server/index.ts --bundle --platform=node --target=node22 --format=esm --packages=external --sourcemap --outfile=dist/server/index.js",
+    "start": "NODE_ENV=production node --enable-source-maps dist/server/index.js",
+    "typecheck": "tsc -p tsconfig.client.json --noEmit && tsc -p tsconfig.server.json --noEmit",
+    "icons": "node scripts/generate-icons.mjs",
+    "check:protocol": "node scripts/protocol-check.mjs"
+  },
+  "dependencies": {
+    "express": "^5.2.1",
+    "pg": "^8.23.1",
+    "proxy-addr": "^2.0.8",
+    "ws": "^8.22.0"
+  },
+  "optionalDependencies": {
+    "bufferutil": "^4.1.0"
+  },
+  "devDependencies": {
+    "@chakra-ui/charts": "^3.37.0",
+    "@chakra-ui/react": "^3.37.0",
+    "@emotion/react": "^11.14.0",
+    "@resvg/resvg-js": "^2.6.2",
+    "@types/express": "^5.0.6",
+    "@types/node": "^24.19.1",
+    "@types/pg": "^8.23.1",
+    "@types/proxy-addr": "^2.0.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/ws": "^8.18.2",
+    "@vitejs/plugin-react": "^6.1.2",
+    "esbuild": "^0.28.2",
+    "lucide-react": "^1.52.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "recharts": "^3.10.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.3",
+    "vite-plugin-pwa": "^2.0.0",
+    "workbox-window": "^7.4.1"
+  }
+}
