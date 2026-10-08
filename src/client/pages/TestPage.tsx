@@ -4,7 +4,6 @@ import { type ReactNode, useEffect, useMemo } from 'react';
 import { Gauge } from '../components/Gauge';
 import { LinkStrip } from '../components/LinkStrip';
 import { MetricCard, type MetricState } from '../components/MetricCard';
-import { PageHeader } from '../components/PageHeader';
 import { PhaseSteps } from '../components/PhaseSteps';
 import { TestsTable } from '../components/TestsTable';
 import { Sparkline } from '../components/charts/Sparkline';
@@ -236,18 +235,6 @@ export function TestPage() {
 
   return (
     <Stack gap={{ base: '4', md: '6' }}>
-      <Box display={{ base: 'none', md: 'block' }}>
-        <PageHeader
-          title="Speed test"
-          description={`Measures the link between this device and ${serverName}.`}
-          actions={
-            <Link asChild textStyle="sm" color="fg.muted" _hover={{ color: 'fg' }}>
-              <RouterLink href="/settings">{configSummary(settings)}</RouterLink>
-            </Link>
-          }
-        />
-      </Box>
-
       <LinkStrip
         deviceLabel={device.label}
         deviceKind={kind}
